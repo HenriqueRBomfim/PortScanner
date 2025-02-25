@@ -4,6 +4,7 @@ import threading
 import tkinter as tk
 from tkinter import scrolledtext
 from queue import Queue
+import nmap  # Importando a biblioteca nmap
 
 def log_result(queue):
     """Atualiza a interface gráfica com os resultados do scan a partir de uma fila."""
@@ -38,27 +39,20 @@ def get_banner(s, port):
     except Exception as e:
         return None
 
-def identify_os_from_banner(banner):
-    """Tenta identificar o sistema operacional a partir do banner."""
-    if not banner:
-        return "Desconhecido"
-    
-    banner = banner.lower()
-    
-    # Comparando padrões comuns de banners para identificar o sistema operacional
-    if "ubuntu" in banner or "debian" in banner:
-        return "Linux (Ubuntu/Debian)"
-    elif "windows" in banner:
-        return "Windows"
-    elif "apache" in banner or "nginx" in banner:
-        return "Linux (Possivelmente com Apache ou Nginx)"
-    elif "openbsd" in banner:
-        return "OpenBSD"
-    else:
-        return "Sistema Operacional Desconhecido"
+def identify_os_from_nmap(target):
+    """Tenta identificar o sistema operacional usando Nmap"""
+    nm = nmap.PortScanner()
+    try:
+        nm.scan(target, '1-1024', arguments='-O')  # -O para tentar detectar o sistema operacional
+        if 'osmatch' in nm[target]:
+            return nm[target]['osmatch'][0]['name']
+        else:
+            return "Sistema operacional não detectado"
+    except Exception as e:
+        return f"Erro ao tentar detectar o sistema operacional: {str(e)}"
 
 def scan_tcp(target, port, ipv6=False, queue=None):
-    """Função que realiza o escaneamento de uma porta TCP e tenta identificar o sistema operacional via banner."""
+    """Função que realiza o escaneamento de uma porta TCP e tenta identificar o sistema operacional via banner e Nmap."""
     try:
         family = socket.AF_INET6 if ipv6 else socket.AF_INET
         s = socket.socket(family, socket.SOCK_STREAM)
@@ -67,7 +61,7 @@ def scan_tcp(target, port, ipv6=False, queue=None):
         
         if result == 0:  # Conexão bem-sucedida (porta aberta)
             banner = get_banner(s, port)  # Captura o banner do serviço
-            os_info = identify_os_from_banner(banner)  # Identifica o sistema operacional com base no banner
+            os_info = identify_os_from_nmap(target)  # Detecta o sistema operacional via Nmap
             message = f"[+] Porta {port} aberta - {get_service_name(port)} | Sistema Operacional: {os_info}"
         elif result == 111 or result == 10061:  # Porta fechada (Linux ou Windows)
             message = f"[-] Porta {port} fechada"
