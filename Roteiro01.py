@@ -39,11 +39,16 @@ def get_banner(s, port):
     except Exception as e:
         return None
 
-def identify_os_from_nmap(target):
+def identify_os_from_nmap(target, ipv6=False):
     """Tenta identificar o sistema operacional usando Nmap"""
     nm = nmap.PortScanner()
     try:
-        nm.scan(target, '1-1024', arguments='-O')  # -O para tentar detectar o sistema operacional
+        # Determina o tipo de IP (IPv4 ou IPv6) e ajusta o comando corretamente
+        arguments = '-O'  # Argumento básico para detecção de SO
+        if ipv6:
+            arguments += ' -6'  # Adiciona o parâmetro IPv6 se necessário
+        
+        nm.scan(target, '1-1024', arguments=arguments)  # Adiciona o intervalo de portas e os argumentos para o scan
         if 'osmatch' in nm[target]:
             return nm[target]['osmatch'][0]['name']
         else:
@@ -61,7 +66,7 @@ def scan_tcp(target, port, ipv6=False, queue=None):
         
         if result == 0:  # Conexão bem-sucedida (porta aberta)
             banner = get_banner(s, port)  # Captura o banner do serviço
-            os_info = identify_os_from_nmap(target)  # Detecta o sistema operacional via Nmap
+            os_info = identify_os_from_nmap(target, ipv6)  # Detecta o sistema operacional via Nmap
             message = f"[+] Porta {port} aberta - {get_service_name(port)} | Sistema Operacional: {os_info}"
         elif result == 111 or result == 10061:  # Porta fechada (Linux ou Windows)
             message = f"[-] Porta {port} fechada"
